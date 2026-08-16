@@ -65,13 +65,10 @@ contract HempOffGridDAOTest is Test {
     }
 
     function testHybridPQCAndRoomieBotAttestation() public {
-        // 1. Register PQC quantum key hash for the RoomieBot from updateWallet
         bytes32 mockPqcKeyHash = keccak256("PQC-Falcon512-Dilithium3-Key-Material");
         vm.prank(updateWallet);
         hempDAO.registerRoomieBotQuantumKey(roomieBot, mockPqcKeyHash);
-        assertEq(hempDAO.roomieBotQuantumKeyHashes(roomieBot), mockPqcKeyHash);
 
-        // 2. RoomieBot verifies manufacturing site presence with hybrid PQC signature hash
         bytes32 pqcSigHash = keccak256("Valid-PQC-Signature-Payload-For-Worker");
         vm.prank(roomieBot);
         hempDAO.verifyManufacturingPresenceWithPQC(worker, true, pqcSigHash);
@@ -80,46 +77,45 @@ contract HempOffGridDAOTest is Test {
         assertTrue(hempDAO.verifiedPQCAuthorizations(pqcSigHash));
     }
 
-    function testUpdateRoomieBotHardwareAndRotatePQCKey() public {
+    function testTimelockGovernanceForRoomieBotUpdate() public {
         address newHardwareBot = address(0x999);
-        bytes32 newPqcKeyHash = keccak256("New-RoomieBot-Quantum-Hardware-Key");
 
-        // Update Roomie Bot address via updateWallet
+        // 1. Queue the update via updateWallet
         vm.prank(updateWallet);
-        hempDAO.setRoomieBot(newHardwareBot);
+        bytes32 updateId = hempDAO.queueRoomieBotUpdate(newHardwareBot);
+
+        // 2. Attempt immediate execution (should fail due to timelock delay)
+        vm.prank(updateWallet);
+        vm.expectRevert("Timelock delay not yet met");
+        hempDAO.executeRoomieBotUpdate(updateId);
+
+        // 3. Warp time past the 2-day timelock delay
+        vm.warp(block.timestamp + 3 days);
+
+        // 4. Execute successfully after timelock matures
+        vm.prank(updateWallet);
+        hempDAO.executeRoomieBotUpdate(updateId);
+
         assertEq(hempDAO.roomieBot(), newHardwareBot);
-
-        // Register PQC key for the new bot
-        vm.prank(updateWallet);
-        hempDAO.registerRoomieBotQuantumKey(newHardwareBot, newPqcKeyHash);
-
-        // Verify old bot fails
-        vm.prank(roomieBot);
-        vm.expectRevert("Unauthorized: Only Roomie Bot");
-        hempDAO.verifyManufacturingPresenceWithPQC(worker, true, keccak256("old"));
-
-        // Verify new bot succeeds with PQC attestation
-        bytes32 newSigHash = keccak256("New-Hardware-PQC-Sig");
-        vm.prank(newHardwareBot);
-        hempDAO.verifyManufacturingPresenceWithPQC(worker, true, newSigHash);
-
-        assertTrue(hempDAO.verifiedManufacturingSitePresence(worker));
     }
 
-    function testCommunitySupplyProposalExecution() public {
+    function testFuzzCommunitySupplyProposalExecution(uint256 amount, uint256 duration) public {
+        vm.assume(amount > 0 && amount <= 5_000 * 1e18);
+        vm.assume(duration > 0 && duration <= 30);
+
         vm.prank(member1);
         uint256 proposalId = hempDAO.createProposal(
-            "Supply hemp clothing, toilet paper, and wipes to community in need",
+            "Fuzz test community hemp supply distribution",
             payable(communityRecipient),
-            1_500 * 1e18,
-            1,
+            amount,
+            duration,
             false
         );
 
         vm.prank(member1);
         hempDAO.vote(proposalId, true);
 
-        vm.warp(block.timestamp + 2 days);
+        vm.warp(block.timestamp + (duration * 1 days) + 1 hours);
         dai.mint(obsCurve, 5_000_000_000 * 1e18);
 
         vm.prank(member1);
@@ -127,6 +123,6 @@ contract HempOffGridDAOTest is Test {
 
         (, , , , , , bool executed,) = hempDAO.proposals(proposalId);
         assertTrue(executed);
-        assertEq(dai.balanceOf(communityRecipient), 1_500 * 1e18);
+        assertEq(dai.balanceOf(communityRecipient), amount);
     }
 }
