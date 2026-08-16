@@ -34,6 +34,7 @@ contract HempOffGridDAOTest is Test {
     address public member1 = address(0x5);
     address public communityRecipient = address(0x6);
     address public obsCurve = address(0x7);
+    address public worker = address(0x8);
 
     function setUp() public {
         dai = new MockDAI();
@@ -58,9 +59,51 @@ contract HempOffGridDAOTest is Test {
         dai.mint(address(hempDAO), 10_000 * 1e18);
     }
 
-    function testHempSpecifications() public {
+    function testHempSpecifications() public view {
         assertEq(hempDAO.HEMP_SPECIFICATION(), "GMO hemp, all natural hemp color, no added colors");
         assertEq(hempDAO.hinduTempleBeneficiary(), hinduTemple);
+    }
+
+    function testHybridPQCAndRoomieBotAttestation() public {
+        // 1. Register PQC quantum key hash for the RoomieBot from updateWallet
+        bytes32 mockPqcKeyHash = keccak256("PQC-Falcon512-Dilithium3-Key-Material");
+        vm.prank(updateWallet);
+        hempDAO.registerRoomieBotQuantumKey(roomieBot, mockPqcKeyHash);
+        assertEq(hempDAO.roomieBotQuantumKeyHashes(roomieBot), mockPqcKeyHash);
+
+        // 2. RoomieBot verifies manufacturing site presence with hybrid PQC signature hash
+        bytes32 pqcSigHash = keccak256("Valid-PQC-Signature-Payload-For-Worker");
+        vm.prank(roomieBot);
+        hempDAO.verifyManufacturingPresenceWithPQC(worker, true, pqcSigHash);
+
+        assertTrue(hempDAO.verifiedManufacturingSitePresence(worker));
+        assertTrue(hempDAO.verifiedPQCAuthorizations(pqcSigHash));
+    }
+
+    function testUpdateRoomieBotHardwareAndRotatePQCKey() public {
+        address newHardwareBot = address(0x999);
+        bytes32 newPqcKeyHash = keccak256("New-RoomieBot-Quantum-Hardware-Key");
+
+        // Update Roomie Bot address via updateWallet
+        vm.prank(updateWallet);
+        hempDAO.setRoomieBot(newHardwareBot);
+        assertEq(hempDAO.roomieBot(), newHardwareBot);
+
+        // Register PQC key for the new bot
+        vm.prank(updateWallet);
+        hempDAO.registerRoomieBotQuantumKey(newHardwareBot, newPqcKeyHash);
+
+        // Verify old bot fails
+        vm.prank(roomieBot);
+        vm.expectRevert("Unauthorized: Only Roomie Bot");
+        hempDAO.verifyManufacturingPresenceWithPQC(worker, true, keccak256("old"));
+
+        // Verify new bot succeeds with PQC attestation
+        bytes32 newSigHash = keccak256("New-Hardware-PQC-Sig");
+        vm.prank(newHardwareBot);
+        hempDAO.verifyManufacturingPresenceWithPQC(worker, true, newSigHash);
+
+        assertTrue(hempDAO.verifiedManufacturingSitePresence(worker));
     }
 
     function testCommunitySupplyProposalExecution() public {
