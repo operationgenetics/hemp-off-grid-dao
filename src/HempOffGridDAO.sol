@@ -4,57 +4,40 @@ pragma solidity ^0.8.20;
 interface IERC20 {
     function transfer(address recipient, uint256 amount) external returns (bool);
     function balanceOf(address account) external view returns (uint256);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
 }
 
 contract HempOffGridDAO {
     uint256 public constant THRESHOLD_DAI = 5_000_000_000 * 1e18;
-    uint256 public constant TIMELOCK_DELAY = 2 days;
+    address public constant OBS_TOKEN_ADDRESS = 0x2D8760e2877148d239a54952A458710553B2B54b;
+    address public constant DESIGNATED_UPDATE_WALLET = 0xaF570ce3b32D765b1236635B0f541a7487A1fB8e;
 
-    address public immutable obsBondingCurve;
     IERC20 public immutable arbitrumDAI;
-
     address public updateWallet;
     address public adminAddress;
     address public roomieBot;
     
-    // Patent & Model tracking fields
-    string public patentedEcoBrickModel;
-    string public patentTitle;
-    string public patentApplicationNumber;
-    string public patentPublicationNumber;
-    string public patentGrantNumber;
-
-    // Hemp Vertical Grow & Product Rules
     string public constant HEMP_SPECIFICATION = "GMO hemp, all natural hemp color, no added colors";
-    string public constant PRODUCT_SCOPE = "Clothing (socks, pants/joggers, shorts, long sleeve, short sleeve, tank top, men & women underwear), hemp toilet paper and wipes";
+    string public constant PRODUCT_SCOPE = "Clothing, hemp toilet paper and wipes";
+    string public constant NONPROFIT_MISSION = "Strictly for free public giveaway and nonprofit use only";
     
-    // DAO Allocation Rules (50% Hindu Temples 501(c)(7), 50% Global Communities)
-    uint256 public constant TEMPLE_ALLOCATION_PERCENT = 50;
-    uint256 public constant COMMUNITY_ALLOCATION_PERCENT = 50;
-    
-    address public hinduTempleBeneficiary; // 501(c)(7) vertical grow recipient
-
-    // Hybrid Post-Quantum Cryptography (PQC) & Hardware Attestation state
     string public pqcAlgorithmSuite = "Hybrid Falcon-512 / Dilithium3 + ECDSA secp256k1";
     mapping(bytes32 => bool) public verifiedPQCAuthorizations;
     mapping(address => bytes32) public roomieBotQuantumKeyHashes;
 
-    // Timelock Queuing for Critical Upgrades
-    struct TimelockUpdate {
-        address targetAddress;
-        bytes32 dataHash;
-        uint256 executeAfter;
-        bool executed;
-    }
-    mapping(bytes32 => TimelockUpdate) public queuedUpdates;
-
     bool public isImmutable = false;
 
+    struct MemberLPInfo {
+        uint256 balance;
+        uint256 lastIssuanceMonth;
+    }
+
+    mapping(address => MemberLPInfo) public memberLP;
+    
     struct Proposal {
         string description;
         address payable recipient;
         uint256 amount;
-        bool isTempleAllocation;
         uint256 yesVotes;
         uint256 noVotes;
         bool executed;
@@ -63,27 +46,21 @@ contract HempOffGridDAO {
 
     mapping(uint256 => Proposal) public proposals;
     mapping(uint256 => mapping(address => bool)) public hasVoted;
-    mapping(address => uint256) public memberWeights;
     mapping(address => bool) public verifiedManufacturingSitePresence;
     uint256 public proposalCount;
-    uint256 public totalVotingWeight;
 
-    event PatentedEcoBrickUpdated(string newModel);
-    event PatentDetailsUpdated(string patentTitle, string applicationNumber, string publicationNumber, string grantNumber);
     event RoomieBotUpdated(address indexed newRoomieBot);
     event RoomieBotSiteVerified(address indexed workerOrBot, bool verified);
-    event TempleBeneficiaryUpdated(address indexed newTemple);
     event PQCSuiteUpdated(string newSuite);
     event QuantumKeyRegistered(address indexed botOrNode, bytes32 keyHash);
-    event UpdateQueued(bytes32 indexed updateId, address targetAddress, uint256 executeAfter);
-    event UpdateExecuted(bytes32 indexed updateId);
-    event ProposalCreated(uint256 indexed proposalId, string description, address recipient, uint256 amount, bool isTempleAllocation);
+    event ProposalCreated(uint256 indexed proposalId, string description, address recipient, uint256 amount);
     event Voted(uint256 indexed proposalId, address indexed voter, bool support, uint256 weight);
     event ProposalExecuted(uint256 indexed proposalId);
     event PermissionsRevoked(address indexed updateWallet);
+    event MonthlyLPIssued(address indexed member, uint256 amount, uint256 monthIdentifier);
 
     modifier onlyUpdateWallet() {
-        require(msg.sender == updateWallet, "Unauthorized: Only update wallet");
+        require(msg.sender == updateWallet && msg.sender == DESIGNATED_UPDATE_WALLET, "Unauthorized: Only designated update wallet");
         require(!isImmutable, "Contract state is immutable");
         _;
     }
@@ -99,134 +76,65 @@ contract HempOffGridDAO {
     }
 
     modifier fundsUnlocked() {
-        require(arbitrumDAI.balanceOf(obsBondingCurve) >= THRESHOLD_DAI, "Treasury locked: 5B DAI threshold not met");
+        require(arbitrumDAI.balanceOf(OBS_TOKEN_ADDRESS) >= THRESHOLD_DAI, "Treasury locked: 5B DAI bonding curve threshold not met");
         _;
     }
 
     constructor(
-        address _obsBondingCurve,
         address _arbitrumDAI,
-        address _updateWallet,
         address _adminAddress,
-        address _roomieBot,
-        address _hinduTempleBeneficiary,
-        address[] memory initialMembers,
-        uint256[] memory weights
+        address _roomieBot
     ) {
-        require(initialMembers.length == weights.length, "Mismatched member and weight lengths");
-        obsBondingCurve = _obsBondingCurve;
         arbitrumDAI = IERC20(_arbitrumDAI);
-        updateWallet = _updateWallet;
+        updateWallet = DESIGNATED_UPDATE_WALLET;
         adminAddress = _adminAddress;
         roomieBot = _roomieBot;
-        hinduTempleBeneficiary = _hinduTempleBeneficiary;
-        
-        patentedEcoBrickModel = "Pending Patent Issuance";
-        patentTitle = "Pending";
-        patentApplicationNumber = "Pending";
-        patentPublicationNumber = "Pending";
-        patentGrantNumber = "Pending";
+    }
 
-        for (uint256 i = 0; i < initialMembers.length; i++) {
-            memberWeights[initialMembers[i]] = weights[i];
-            totalVotingWeight += weights[i];
+    function getCurrentMonthIdentifier() public view returns (uint256) {
+        uint256 year = (block.timestamp / 31536000) + 1970;
+        uint256 month = ((block.timestamp % 31536000) / 2628000) + 1;
+        return (year * 100) + month;
+    }
+
+    function getEffectiveLPBalance(address member) public view returns (uint256) {
+        MemberLPInfo memory info = memberLP[member];
+        if (info.lastIssuanceMonth < getCurrentMonthIdentifier()) {
+            return 0; 
         }
+        return info.balance;
     }
 
-    function setPatentedEcoBrick(string memory _model) external onlyAdmin {
-        patentedEcoBrickModel = _model;
-        emit PatentedEcoBrickUpdated(_model);
-    }
-
-    function setPatentDetails(
-        string memory _patentTitle,
-        string memory _patentApplicationNumber,
-        string memory _patentPublicationNumber,
-        string memory _patentGrantNumber
-    ) external onlyUpdateWallet {
-        patentTitle = _patentTitle;
-        patentApplicationNumber = _patentApplicationNumber;
-        patentPublicationNumber = _patentPublicationNumber;
-        patentGrantNumber = _patentGrantNumber;
-        
-        emit PatentDetailsUpdated(_patentTitle, _patentApplicationNumber, _patentPublicationNumber, _patentGrantNumber);
-    }
-
-    function queueRoomieBotUpdate(address _newRoomieBot) external onlyUpdateWallet returns (bytes32 updateId) {
-        updateId = keccak256(abi.encodePacked(_newRoomieBot, block.timestamp));
-        queuedUpdates[updateId] = TimelockUpdate({
-            targetAddress: _newRoomieBot,
-            dataHash: keccak256(abi.encodePacked(_newRoomieBot)),
-            executeAfter: block.timestamp + TIMELOCK_DELAY,
-            executed: false
-        });
-        emit UpdateQueued(updateId, _newRoomieBot, block.timestamp + TIMELOCK_DELAY);
-    }
-
-    function executeRoomieBotUpdate(bytes32 updateId) external onlyUpdateWallet {
-        TimelockUpdate storage upd = queuedUpdates[updateId];
-        require(!upd.executed, "Update already executed");
-        require(block.timestamp >= upd.executeAfter, "Timelock delay not yet met");
-
-        upd.executed = true;
-        roomieBot = upd.targetAddress;
-        emit RoomieBotUpdated(roomieBot);
-    }
-
-    function setRoomieBotDirect(address _roomieBot) external onlyUpdateWallet {
-        roomieBot = _roomieBot;
-        emit RoomieBotUpdated(_roomieBot);
-    }
-
-    function setHinduTempleBeneficiary(address _newTemple) external onlyAdmin {
-        hinduTempleBeneficiary = _newTemple;
-        emit TempleBeneficiaryUpdated(_newTemple);
-    }
-
-    function setPQCAlgorithmSuite(string memory _newSuite) external onlyUpdateWallet {
-        pqcAlgorithmSuite = _newSuite;
-        emit PQCSuiteUpdated(_newSuite);
-    }
-
-    function registerRoomieBotQuantumKey(address botOrNode, bytes32 pqcKeyHash) external onlyUpdateWallet {
-        roomieBotQuantumKeyHashes[botOrNode] = pqcKeyHash;
-        emit QuantumKeyRegistered(botOrNode, pqcKeyHash);
-    }
-
-    function verifyManufacturingPresenceWithPQC(
-        address workerOrBot, 
-        bool status, 
-        bytes32 pqcSignatureHash
-    ) external onlyRoomieBot {
-        require(roomieBotQuantumKeyHashes[msg.sender] != bytes32(0), "Roomie bot PQC key not registered");
-        verifiedPQCAuthorizations[pqcSignatureHash] = true;
-        
-        verifiedManufacturingSitePresence[workerOrBot] = status;
-        emit RoomieBotSiteVerified(workerOrBot, status);
+    function claimMonthlyLP() external {
+        uint256 currentMonth = getCurrentMonthIdentifier();
+        MemberLPInfo storage info = memberLP[msg.sender];
+        require(info.lastIssuanceMonth < currentMonth, "Monthly LP already claimed or active");
+        info.balance = 100 * 1e18; 
+        info.lastIssuanceMonth = currentMonth;
+        emit MonthlyLPIssued(msg.sender, 100 * 1e18, currentMonth);
     }
 
     function createProposal(
         string memory description, 
         address payable recipient, 
         uint256 amount, 
-        uint256 durationDays,
-        bool isTempleAllocation
+        uint256 durationDays
     ) external returns (uint256) {
-        require(memberWeights[msg.sender] > 0, "Only weighted DAO members can propose");
+        uint256 lpBal = getEffectiveLPBalance(msg.sender);
+        require(lpBal >= 50 * 1e18, "Insufficient active LP tokens: 50 LP required for proposal");
         
         uint256 proposalId = proposalCount++;
         proposals[proposalId] = Proposal({
             description: description,
             recipient: recipient,
             amount: amount,
-            isTempleAllocation: isTempleAllocation,
             yesVotes: 0,
             noVotes: 0,
             executed: false,
             deadline: block.timestamp + (durationDays * 1 days)
         });
 
-        emit ProposalCreated(proposalId, description, recipient, amount, isTempleAllocation);
+        emit ProposalCreated(proposalId, description, recipient, amount);
         return proposalId;
     }
 
@@ -236,8 +144,8 @@ contract HempOffGridDAO {
         require(!proposal.executed, "Proposal already executed");
         require(!hasVoted[proposalId][msg.sender], "Already voted");
         
-        uint256 weight = memberWeights[msg.sender];
-        require(weight > 0, "No voting weight");
+        uint256 weight = getEffectiveLPBalance(msg.sender);
+        require(weight > 0, "No active voting weight or tokens expired");
 
         hasVoted[proposalId][msg.sender] = true;
         if (support) {
@@ -260,6 +168,27 @@ contract HempOffGridDAO {
         require(success, "DAI transfer failed");
 
         emit ProposalExecuted(proposalId);
+    }
+
+    function registerRoomieBotQuantumKey(address botOrNode, bytes32 pqcKeyHash) external onlyUpdateWallet {
+        roomieBotQuantumKeyHashes[botOrNode] = pqcKeyHash;
+        emit QuantumKeyRegistered(botOrNode, pqcKeyHash);
+    }
+
+    function verifyManufacturingPresenceWithPQC(
+        address workerOrBot, 
+        bool status, 
+        bytes32 pqcSignatureHash
+    ) external onlyRoomieBot {
+        require(roomieBotQuantumKeyHashes[msg.sender] != bytes32(0), "Roomie bot PQC key not registered");
+        verifiedPQCAuthorizations[pqcSignatureHash] = true;
+        verifiedManufacturingSitePresence[workerOrBot] = status;
+        emit RoomieBotSiteVerified(workerOrBot, status);
+    }
+
+    function setRoomieBotDirect(address _roomieBot) external onlyUpdateWallet {
+        roomieBot = _roomieBot;
+        emit RoomieBotUpdated(_roomieBot);
     }
 
     function revokeAndUpdatePermissions() external onlyUpdateWallet {
