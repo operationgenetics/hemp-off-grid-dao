@@ -1,21 +1,11 @@
 {
-  "name": "hemp-off-grid-dao-clean",
+  "name": "eco-brick-dao",
   "version": "1.0.0",
-  "description": "**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**",
+  "description": "Off-Grid Eco-Brick DAO deployment script",
   "main": "deploy.js",
-  "directories": {
-    "lib": "lib",
-    "test": "test"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "type": "commonjs",
   "dependencies": {
-    "@walletconnect/ethereum-provider": "^2.23.10",
-    "dotenv": "^17.4.2",
-    "ethers": "^6.17.0",
+    "@walletconnect/ethereum-provider": "^2.11.0",
+    "ethers": "^6.11.0",
     "qrcode-terminal": "^0.12.0"
   }
 }
