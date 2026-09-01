@@ -1,11 +1,6 @@
 {
-  "$schema": "https://opencode.ai/config.json",
-  "model": "opencode/mimo-v2.5-free",
-  "provider": {
-    "opencode": {
-      "options": {
-        "apiKey": "{env:OPENCODE_ZEN_API_KEY}"
-      }
-    }
-  }
+  "version": "1.18.25",
+  "model": "mimo-v2.5-free",
+  "provider": "opencode-zen",
+  "autonomous_mode": true
 }

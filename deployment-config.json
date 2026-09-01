@@ -1,0 +1,7 @@
+{
+  "network": "arbitrum-one",
+  "deployerWallet": "0xaF570ce3b32D765b1236635B0f541a7487A1fB8e",
+  "obsTokenAddress": "0x2D8760e2877148d239a54952A458710553B2B54b",
+  "bondingCurveTargetDAI": 5000000000,
+  "executionMode": "walletconnect-metamask"
+}
