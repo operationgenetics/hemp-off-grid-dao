@@ -1,6 +1,4 @@
 {
-  "version": "1.18.25",
-  "model": "mimo-v2.5-free",
-  "provider": "opencode-zen",
-  "autonomous_mode": true
+  "$schema": "https://opencode.ai/config.json",
+  "model": "opencode/mimo-v2.5-free"
 }
