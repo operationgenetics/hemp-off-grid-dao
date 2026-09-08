@@ -1,11 +1,20 @@
 {
-  "name": "eco-brick-dao",
+  "name": "hemp-off-grid-dao",
   "version": "1.0.0",
-  "description": "Off-Grid Eco-Brick DAO deployment script",
-  "main": "deploy.js",
+  "description": "Hemp Off-Grid DAO \u2014 Arbitrum One. Off-grid compile and MetaMask deploy, zero configuration.",
+  "main": "compile.js",
   "dependencies": {
-    "@walletconnect/ethereum-provider": "^2.11.0",
-    "ethers": "^6.11.0",
-    "qrcode-terminal": "^0.12.0"
+    "@walletconnect/ethereum-provider": "^2.24.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "solc": "0.8.24"
+  },
+  "scripts": {
+    "build": "node compile.js src/HempOffGridDAO.sol",
+    "deploy": "node deploy.js",
+    "test": "forge test",
+    "sizes": "forge build --sizes",
+    "slither": "slither src/HempOffGridDAO.sol --exclude-informational --exclude-low",
+    "bundle": "esbuild tools/wc-entry.js --bundle --format=iife --platform=browser --target=es2020 --minify --define:process.env.NODE_ENV='\"production\"' --outfile=build/wc.js"
   }
 }

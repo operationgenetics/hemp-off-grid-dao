@@ -47,9 +47,9 @@ echo ""
 echo "2. CONTRACT ADDRESS VERIFICATION"
 echo "---------------------------------"
 info "Verifying OBS Token address..."
-if grep -q "0x2D8760e2877148d239a54952A458710553B2B54b" contracts/HempOffGridDAO.sol 2>/dev/null || \
-   grep -q "0x2D8760e2877148d239a54952A458710553B2B54b" src/HempOffGridDAO.sol 2>/dev/null; then
-    pass "OBS Token address: 0x2D8760e2877148d239a54952A458710553B2B54b"
+if grep -q "0xa473BdD164F992717Bdbd5F7e10F168C7Ad5D7B0" contracts/HempOffGridDAO.sol 2>/dev/null || \
+   grep -q "0xa473BdD164F992717Bdbd5F7e10F168C7Ad5D7B0" src/HempOffGridDAO.sol 2>/dev/null; then
+    pass "OBS Token address: 0xa473BdD164F992717Bdbd5F7e10F168C7Ad5D7B0"
 else
     fail "OBS Token address not found"
 fi
@@ -274,7 +274,7 @@ echo ""
 echo "=========================================="
 echo "VERIFIED SPECIFICATIONS"
 echo "=========================================="
-echo "- OBS Token:    0x2D8760e2877148d239a54952A458710553B2B54b"
+echo "- OBS Token:    0xa473BdD164F992717Bdbd5F7e10F168C7Ad5D7B0"
 echo "- Admin Wallet: 0xaF570ce3b32D765b1236635B0f541a7487A1fB8e"
 echo "- Bonding Curve: 5 Billion DAI threshold"
 echo "- LP System:    100/month, 50 to propose, 1:1 votes, monthly expiry"

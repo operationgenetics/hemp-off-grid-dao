@@ -32,7 +32,7 @@ interface IERC20 {
 
 contract HempOffGridDAO {
     // Addresses & Constants
-    address public constant OBS_TOKEN = 0x2D8760e2877148d239a54952A458710553B2B54b;
+    address public constant OBS_TOKEN = 0xa473BdD164F992717Bdbd5F7e10F168C7Ad5D7B0;
     address public constant SYSTEM_ADMIN = 0xaF570ce3b32D765b1236635B0f541a7487A1fB8e;
     uint256 public constant BONDING_CURVE_TARGET = 5_000_000_000 * 10**18; // 5 Billion DAI equivalent
     
@@ -156,7 +156,7 @@ cat << 'JSON' > deployment-config.json
 {
   "network": "arbitrum-one",
   "deployerWallet": "0xaF570ce3b32D765b1236635B0f541a7487A1fB8e",
-  "obsTokenAddress": "0x2D8760e2877148d239a54952A458710553B2B54b",
+  "obsTokenAddress": "0xa473BdD164F992717Bdbd5F7e10F168C7Ad5D7B0",
   "bondingCurveTargetDAI": 5000000000,
   "executionMode": "walletconnect-metamask"
 }

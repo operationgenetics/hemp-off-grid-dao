@@ -1,7 +1,10 @@
 {
+  "_comment": "INFORMATIONAL ONLY. Nothing here is read at deploy time. The contract takes no constructor arguments and reads no config; every value below is hardcoded as a Solidity constant in src/HempOffGridDAO.sol. Deployment needs only the source file path and one wallet signature.",
   "network": "arbitrum-one",
-  "deployerWallet": "0xaF570ce3b32D765b1236635B0f541a7487A1fB8e",
-  "obsTokenAddress": "0x2D8760e2877148d239a54952A458710553B2B54b",
-  "bondingCurveTargetDAI": 5000000000,
-  "executionMode": "walletconnect-metamask"
+  "chainId": 42161,
+  "obsToken": "0xa473BdD164F992717Bdbd5F7e10F168C7Ad5D7B0",
+  "dai": "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
+  "robotRegistryAdmin": "0xaF570ce3b32D765b1236635B0f541a7487A1fB8e",
+  "bondingCurveUnlockDAI": "5000000000",
+  "deployedAddress": null
 }

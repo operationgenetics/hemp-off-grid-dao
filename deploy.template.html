@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hemp Off-Grid DAO — Off-Grid Deployer</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin:0; padding:24px; font:15px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;
+         background:#0e1110; color:#dfe7e2; }
+  main { max-width: 780px; margin: 0 auto; }
+  h1 { font-size:19px; margin:0 0 4px; letter-spacing:.02em; }
+  .sub { color:#7f8f88; margin:0 0 22px; font-size:13px; }
+  section { border:1px solid #242c29; border-radius:8px; padding:16px; margin-bottom:14px; background:#141817; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:#7f8f88; margin:0 0 12px; }
+  label { display:block; font-size:12px; color:#9fb0a8; margin:10px 0 4px; }
+  input { width:100%; box-sizing:border-box; padding:8px 10px; border-radius:5px;
+          border:1px solid #2c3633; background:#0b0e0d; color:#dfe7e2; font:inherit; font-size:13px; }
+  button { margin-top:14px; padding:10px 16px; border-radius:6px; border:1px solid #2f6f52;
+           background:#164032; color:#cfe9dd; font:inherit; cursor:pointer; }
+  button:hover:not(:disabled) { background:#1d5340; }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  button.danger { border-color:#7a3a3a; background:#3d1c1c; color:#f0cfcf; }
+  button.danger:hover:not(:disabled) { background:#512525; }
+  .kv { display:flex; gap:10px; font-size:12.5px; padding:3px 0; }
+  .kv b { color:#7f8f88; font-weight:400; min-width:170px; }
+  .kv span { color:#cfe0d8; word-break:break-all; }
+  #log { white-space:pre-wrap; font-size:12.5px; color:#9fb0a8; background:#0b0e0d;
+         border:1px solid #242c29; border-radius:6px; padding:12px; min-height:70px; margin-top:14px; }
+  .ok { color:#7fd6a8; } .err { color:#f08f8f; } .warn { color:#e0c07a; }
+  a { color:#7fd6a8; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Hemp Off-Grid DAO — Deployer</h1>
+  <p class="sub">
+    Fully local. No CDN, no libraries, no relay server, no API key, no project ID.
+    This page talks only to your wallet, and your wallet talks only to whichever
+    Arbitrum One RPC you have configured — point it at your own node to stay off-grid.
+  </p>
+
+  <section>
+    <h2>Contract</h2>
+    <div class="kv"><b>Source</b><span id="src"></span></div>
+    <div class="kv"><b>Compiler</b><span id="solc"></span></div>
+    <div class="kv"><b>Initcode size</b><span id="size"></span></div>
+    <div class="kv"><b>Constructor arguments</b><span class="ok">none — nothing to fill in</span></div>
+    <div class="kv"><b>OBS token</b><span>0xa473BdD164F992717Bdbd5F7e10F168C7Ad5D7B0</span></div>
+    <div class="kv"><b>Registry admin wallet</b><span>0xaF570ce3b32D765b1236635B0f541a7487A1fB8e</span></div>
+    <div class="kv"><b>Bonding-curve unlock</b><span>5,000,000,000 DAI</span></div>
+  </section>
+
+  <section>
+    <h2>1 &middot; Wallet</h2>
+    <div class="kv"><b>Account</b><span id="acct">not connected</span></div>
+    <div class="kv"><b>Chain</b><span id="chain">—</span></div>
+    <div class="kv"><b>Transport</b><span id="transport">—</span></div>
+    <button id="connect">Connect MetaMask in this browser</button>
+    <button id="wconnect">Connect with WalletConnect (scan with MetaMask app)</button>
+    <div id="wcbox" hidden>
+      <p class="sub" style="margin:14px 0 8px">
+        Open MetaMask on your phone &rarr; menu &rarr; <b>Scan</b>, and scan this code.
+        This is a WalletConnect pairing code, not a web address: your phone connects
+        its wallet to this page and never opens a browser or leaves the app.
+      </p>
+      <canvas id="wcqr" style="background:#fff;padding:10px;border-radius:8px"></canvas>
+    </div>
+  </section>
+
+  <section>
+    <h2>2 &middot; Gas cost right now</h2>
+    <p class="sub" style="margin:0 0 10px">
+      On Arbitrum most of what you pay is the cost of posting this transaction to
+      Ethereum L1, and Arbitrum already folds that into the gas estimate. The estimate
+      therefore moves with the <b>Ethereum</b> base fee, not with anything in this page.
+      Refresh until you see a number you like, then deploy — waiting for a quiet hour on
+      L1 is by far the biggest saving available.
+    </p>
+    <div class="kv"><b>Estimated gas</b><span id="gasUnits">—</span></div>
+    <div class="kv"><b>Gas price</b><span id="gasPrice">—</span></div>
+    <div class="kv"><b>Estimated cost</b><span id="gasCost">—</span></div>
+    <div class="kv"><b>Last checked</b><span id="gasWhen">—</span></div>
+    <button id="estimate" disabled>Refresh estimate</button>
+  </section>
+
+  <section>
+    <h2>3 &middot; Deploy</h2>
+    <p class="sub" style="margin:0">Sign one transaction. There is nothing to configure first.</p>
+    <button id="deploy" disabled>Deploy HempOffGridDAO</button>
+    <div class="kv" style="margin-top:12px"><b>Deployed at</b><span id="addr">—</span></div>
+  </section>
+
+  <section>
+    <h2>4 &middot; ML-DSA-65 verifier &mdash; the post-quantum half</h2>
+    <p class="sub" style="margin:0">
+      Deploys the verifier for your robot's PQC public key, then proves its cache
+      on-chain. <b>ExpandA(rho) and H(pk) are recomputed by the contract and rejected
+      unless they match</b> &mdash; nobody, including you, can install a forged matrix.
+      Four signatures: deploy, commitTr, three chunk commits, seal. Roughly 20M gas per
+      chunk, which fits an Arbitrum block. Do this before revoking.
+    </p>
+    <label>Robot MCU post-quantum public key (hex, 1952 bytes for ML-DSA-65)</label>
+    <input id="vpk" placeholder="0x… from the Roomie MCU">
+    <button id="vdeploy" disabled>1. Deploy verifier</button>
+    <button id="vcommit" disabled>2. Prove cache &amp; seal (5 signatures)</button>
+    <div class="kv" style="margin-top:12px"><b>Verifier at</b><span id="vaddr">—</span></div>
+  </section>
+
+  <section>
+    <h2>5 &middot; setupRoomieRobotAndLock</h2>
+    <p class="sub" style="margin:0">
+      Callable immediately, and re-callable every time you get new hardware, until you
+      revoke. Only <code>0xaF57…fB8e</code> may call it. Public keys only — biometric
+      templates stay on the MCU and must never be entered here.
+    </p>
+    <label>Robot MCU classical signer address (secp256k1)</label>
+    <input id="signer" placeholder="0x… — use any placeholder address until the robot arrives">
+    <label>PQC public key (hex, 0x-prefixed) — ML-DSA-65 is 1952 bytes</label>
+    <input id="pqc" value="0x01" placeholder="0x… placeholder is fine for now">
+    <label>PQC verifier contract (0x0 to anchor the PQC half instead of verifying on-chain)</label>
+    <input id="verifier" value="0x0000000000000000000000000000000000000000">
+    <label>Bonding-curve reserve contract (the address whose DAI balance must reach 5B)</label>
+    <input id="reserve" placeholder="0x…">
+    <button id="setup" disabled>Sign setupRoomieRobotAndLock</button>
+  </section>
+
+  <section>
+    <h2>6 &middot; revokeAndFinalize — one way, permanent</h2>
+    <p class="sub" style="margin:0">
+      Destroys the admin role forever. After this no address can change anything, ever.
+      Refused unless a real PQC key (&ge;1312 bytes), a reserve address <b>and a working
+      PQC verifier</b> are registered, so no sealed DAO can ever rest on secp256k1 alone. Do this only after the robot is
+      in hand and its real key is on-chain.
+    </p>
+    <button id="revoke" class="danger" disabled>Permanently revoke and make immutable</button>
+  </section>
+
+  <div id="log">Waiting for wallet…</div>
+</main>
+
+<script src="/wc.js"></script>
+<script>
+const ARTIFACTS = /*__ARTIFACTS__*/;
+const ARTIFACT = ARTIFACTS.HempOffGridDAO;
+const VERIFIER = ARTIFACTS.MLDSA65Verifier;
+const ARB_ONE = '0xa4b1'; // 42161
+const WC_PROJECT_ID = '__WC_PROJECT_ID__';
+const ARB_RPC = '__ARB_RPC__';
+const ADMIN = '0xaf570ce3b32d765b1236635b0f541a7487a1fb8e';
+
+const $ = (id) => document.getElementById(id);
+const logEl = $('log');
+let account = null, deployed = null;
+
+function log(msg, cls) {
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = msg;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+$('src').textContent = ARTIFACT.sourceFile;
+$('solc').textContent = ARTIFACT.compiler;
+$('size').textContent = ((ARTIFACT.bytecode.length - 2) / 2) + ' bytes';
+
+/* ---- minimal ABI encoding: enough for this contract, no library needed ---- */
+const pad = (hex) => hex.replace(/^0x/, '').toLowerCase().padStart(64, '0');
+const encAddr = (a) => {
+  if (!/^0x[0-9a-fA-F]{40}$/.test(a.trim())) throw new Error('Not a valid address: ' + a);
+  return pad(a.trim());
+};
+function encBytes(hex) {
+  let h = hex.trim().replace(/^0x/, '');
+  if (h.length % 2) throw new Error('Hex string must have an even number of digits');
+  if (!/^[0-9a-fA-F]*$/.test(h)) throw new Error('PQC key must be hex');
+  const len = (h.length / 2).toString(16).padStart(64, '0');
+  const padded = h.length % 64 ? h.padEnd(h.length + (64 - (h.length % 64)), '0') : h;
+  return len + padded;
+}
+const selector = (sig) => {
+  const s = ARTIFACT.methodIdentifiers[sig];
+  if (!s) throw new Error('Selector missing from artifact: ' + sig);
+  return '0x' + s;
+};
+
+let provider = null; // EIP-1193: injected MetaMask, or the WalletConnect session
+
+async function rpc(method, params) {
+  if (!provider) throw new Error('No wallet connected');
+  return provider.request({ method, params });
+}
+
+async function requireArbitrum() {
+  const chain = await rpc('eth_chainId', []);
+  $('chain').textContent = chain === ARB_ONE ? 'Arbitrum One (42161)' : chain + ' — wrong network';
+  if (chain !== ARB_ONE) {
+    log('Switching wallet to Arbitrum One…', 'warn');
+    await rpc('wallet_switchEthereumChain', [{ chainId: ARB_ONE }]);
+    $('chain').textContent = 'Arbitrum One (42161)';
+  }
+}
+
+async function afterConnect(accs, transport) {
+  account = accs[0];
+  $('acct').textContent = account;
+  $('transport').textContent = transport;
+  await requireArbitrum();
+  $('deploy').disabled = false;
+  $('estimate').disabled = false;
+  $('vdeploy').disabled = false;
+  log('Connected over ' + transport + '.', 'ok');
+  if (account.toLowerCase() !== ADMIN) {
+    log('Note: this is not the registry admin wallet. Deployment will still work, but '
+      + 'setupRoomieRobotAndLock and revokeAndFinalize can only be signed by 0xaF57…fB8e.', 'warn');
+  }
+  estimate();
+}
+
+$('wconnect').onclick = async () => {
+  try {
+    $('wconnect').disabled = true;
+    if (!WC_PROJECT_ID) {
+      throw new Error('WalletConnect needs a project id. Get a free one at cloud.reown.com, '
+        + 'then restart with: WALLETCONNECT_PROJECT_ID=<id> node deploy.js');
+    }
+    if (typeof window.WC === 'undefined') {
+      throw new Error('WalletConnect bundle not loaded — run `node deploy.js` rather than opening the file directly.');
+    }
+
+    const wc = await window.WC.EthereumProvider.init({
+      projectId: WC_PROJECT_ID,
+      chains: [42161],                 // Arbitrum One
+      optionalChains: [42161],
+      showQrModal: false,              // we draw the code ourselves, no third-party modal
+      rpcMap: { 42161: ARB_RPC },
+      metadata: {
+        name: 'Hemp Off-Grid DAO Deployer',
+        description: 'Deploy HempOffGridDAO to Arbitrum One',
+        url: window.location.origin,
+        icons: [],
+      },
+    });
+
+    wc.on('display_uri', async (uri) => {
+      $('wcbox').hidden = false;
+      await window.WC.QRCode.toCanvas($('wcqr'), uri, { width: 288, margin: 1 });
+      log('Pairing code ready — scan it with the MetaMask app.');
+    });
+
+    await wc.connect();
+    provider = wc;
+    $('wcbox').hidden = true;
+    wc.on('disconnect', () => location.reload());
+    wc.on('accountsChanged', () => location.reload());
+    wc.on('chainChanged', () => location.reload());
+    await afterConnect(wc.accounts, 'WalletConnect');
+  } catch (e) {
+    log(e.message, 'err');
+    $('wconnect').disabled = false;
+  }
+};
+
+$('connect').onclick = async () => {
+  try {
+    if (!window.ethereum) throw new Error('No injected wallet found. Open this page in a browser with MetaMask, or use WalletConnect.');
+    provider = window.ethereum;
+    const accs = await rpc('eth_requestAccounts', []);
+    await afterConnect(accs, 'injected MetaMask');
+  } catch (e) { log(e.message, 'err'); provider = null; }
+};
+
+async function waitForReceipt(hash) {
+  log('Tx ' + hash + ' — waiting for confirmation…');
+  for (;;) {
+    const r = await rpc('eth_getTransactionReceipt', [hash]);
+    if (r) return r;
+    await new Promise((res) => setTimeout(res, 2500));
+  }
+}
+
+function fmtEth(wei) {
+  const s = wei.toString().padStart(19, '0');
+  const whole = s.slice(0, -18), frac = s.slice(-18).replace(/0+$/, '') || '0';
+  return `${whole}.${frac.slice(0, 8)} ETH`;
+}
+
+async function estimate() {
+  try {
+    $('estimate').disabled = true;
+    const [gasHex, priceHex] = await Promise.all([
+      rpc('eth_estimateGas', [{ from: account, data: ARTIFACT.bytecode }]),
+      rpc('eth_gasPrice', []),
+    ]);
+    const gas = BigInt(gasHex), price = BigInt(priceHex);
+    $('gasUnits').textContent = gas.toLocaleString();
+    $('gasPrice').textContent = (Number(price) / 1e9).toFixed(4) + ' gwei';
+    $('gasCost').textContent = fmtEth(gas * price);
+    $('gasWhen').textContent = new Date().toLocaleTimeString();
+    log(`Estimate: ${gas.toLocaleString()} gas @ ${(Number(price) / 1e9).toFixed(4)} gwei = ${fmtEth(gas * price)}`);
+  } catch (e) {
+    log('Estimate failed: ' + e.message, 'err');
+  }
+  $('estimate').disabled = false;
+}
+
+$('estimate').onclick = estimate;
+
+$('deploy').onclick = async () => {
+  try {
+    $('deploy').disabled = true;
+    await requireArbitrum();
+    const hash = await rpc('eth_sendTransaction', [{ from: account, data: ARTIFACT.bytecode }]);
+    const r = await waitForReceipt(hash);
+    if (r.status !== '0x1') throw new Error('Deployment reverted');
+    deployed = r.contractAddress;
+    $('addr').textContent = deployed;
+    $('setup').disabled = false;
+    $('revoke').disabled = false;
+    log('Deployed at ' + deployed, 'ok');
+    log('Verify with: forge verify-contract ' + deployed + ' src/HempOffGridDAO.sol:HempOffGridDAO --chain arbitrum');
+    // When this page is served by deploy.js, hand the address back so the CLI can
+    // record it. Harmless (and silently skipped) when opened straight from file://.
+    fetch('/deployed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: deployed, txHash: hash, deployer: account }),
+    }).catch(() => {});
+  } catch (e) {
+    log(e.message, 'err');
+    $('deploy').disabled = false;
+  }
+};
+
+/* ---- ML-DSA-65 verifier ---- */
+let verifierAddr = null;
+
+function encUint(n) { return pad(BigInt(n).toString(16)); }
+
+$('vdeploy').onclick = async () => {
+  try {
+    $('vdeploy').disabled = true;
+    const pkHex = $('vpk').value.trim().replace(/^0x/, '');
+    if (pkHex.length !== 1952 * 2) throw new Error('ML-DSA-65 public key must be exactly 1952 bytes');
+    // constructor(bytes pk, address committer)
+    const args = encUint(0x40) + encAddr(account) + encBytes('0x' + pkHex);
+    const hash = await rpc('eth_sendTransaction', [{ from: account, data: VERIFIER.bytecode + args }]);
+    const r = await waitForReceipt(hash);
+    if (r.status !== '0x1') throw new Error('verifier deployment reverted');
+    verifierAddr = r.contractAddress;
+    $('vaddr').textContent = verifierAddr;
+    $('verifier').value = verifierAddr;
+    $('vcommit').disabled = false;
+    log('Verifier deployed at ' + verifierAddr, 'ok');
+  } catch (e) { log(e.message, 'err'); $('vdeploy').disabled = false; }
+};
+
+$('vcommit').onclick = async () => {
+  try {
+    $('vcommit').disabled = true;
+    const pkHex = $('vpk').value.trim();
+
+    log('Fetching ExpandA chunks…');
+    const res = await fetch('/chunks?pk=' + encodeURIComponent(pkHex));
+    if (!res.ok) throw new Error('chunk service unavailable — run `node deploy.js` rather than opening the file directly');
+    const { chunks } = await res.json();
+
+    const sel = (sig) => '0x' + VERIFIER.methodIdentifiers[sig];
+
+    log('commitTr…');
+    let h = await rpc('eth_sendTransaction', [{ from: account, to: verifierAddr, data: sel('commitTr()') }]);
+    if ((await waitForReceipt(h)).status !== '0x1') throw new Error('commitTr reverted');
+
+    for (let i = 0; i < 3; i++) {
+      log(`commitMatrixChunk ${i} (the contract recomputes and checks every coefficient)…`);
+      const data = sel('commitMatrixChunk(uint256,bytes)') + encUint(i) + encUint(0x40) + encBytes(chunks[i]);
+      h = await rpc('eth_sendTransaction', [{ from: account, to: verifierAddr, data }]);
+      if ((await waitForReceipt(h)).status !== '0x1') throw new Error('chunk ' + i + ' rejected');
+    }
+
+    log('seal…');
+    h = await rpc('eth_sendTransaction', [{ from: account, to: verifierAddr, data: sel('seal()') }]);
+    if ((await waitForReceipt(h)).status !== '0x1') throw new Error('seal reverted');
+
+    log('Verifier sealed. Full hybrid PQC is now enforceable on-chain.', 'ok');
+  } catch (e) { log(e.message, 'err'); $('vcommit').disabled = false; }
+};
+
+$('setup').onclick = async () => {
+  try {
+    $('setup').disabled = true;
+    const data = selector('setupRoomieRobotAndLock(address,bytes,address,address)')
+      + encAddr($('signer').value)
+      + pad((4 * 32).toString(16))     // offset to the bytes tail
+      + encAddr($('verifier').value)
+      + encAddr($('reserve').value)
+      + encBytes($('pqc').value);
+    const hash = await rpc('eth_sendTransaction', [{ from: account, to: deployed, data }]);
+    const r = await waitForReceipt(hash);
+    log(r.status === '0x1' ? 'Robot registry updated.' : 'Reverted — check you are signing from 0xaF57…fB8e.',
+        r.status === '0x1' ? 'ok' : 'err');
+  } catch (e) { log(e.message, 'err'); }
+  $('setup').disabled = false;
+};
+
+$('revoke').onclick = async () => {
+  if (!confirm('This permanently destroys the admin role. The contract can never be changed again by anyone. Continue?')) return;
+  try {
+    $('revoke').disabled = true;
+    const hash = await rpc('eth_sendTransaction',
+      [{ from: account, to: deployed, data: selector('revokeAndFinalize()') }]);
+    const r = await waitForReceipt(hash);
+    log(r.status === '0x1' ? 'Contract is now permanently immutable.' : 'Reverted — a real PQC key and reserve must be registered first.',
+        r.status === '0x1' ? 'ok' : 'err');
+  } catch (e) { log(e.message, 'err'); }
+  $('revoke').disabled = false;
+};
+
+if (window.ethereum) {
+  logEl.textContent = 'MetaMask detected in this browser. Press Connect, or use WalletConnect to sign from your phone.';
+  window.ethereum.on('accountsChanged', () => { if (provider === window.ethereum) location.reload(); });
+  window.ethereum.on('chainChanged', () => { if (provider === window.ethereum) location.reload(); });
+} else {
+  logEl.textContent = 'No wallet in this browser. Use WalletConnect to sign from the MetaMask app.';
+  $('connect').disabled = true;
+}
+if (!WC_PROJECT_ID) {
+  $('wconnect').disabled = true;
+  $('wconnect').title = 'Set WALLETCONNECT_PROJECT_ID to enable';
+}
+</script>
+</body>
+</html>
